@@ -18,6 +18,26 @@ pub fn get_counts() -> (usize, usize) {
     (res1, res2)
 }
 
+fn get_zone_map(queens: u64, exclusion_map: [u8; 64]) -> [u8; 64] {
+    let mut zone_map = [0; 64];
+    // TODO: Implement
+    zone_map
+}
+
+// Gets the indices of the queens on the board (between 0 and 63)
+fn get_queen_indices(queens: u64) -> [usize; 8] {
+    let mut indices = [0; 8];
+    for row in 0..8 {
+        // Mask out all but the nth row
+        let row_mask = 0b11111111 << (row * 8);
+        let row_queens = queens & row_mask;
+        // Find the column of the queen in this row
+        let col = (row_queens >> (row * 8)).trailing_zeros() as usize;
+        indices[row] = row * 8 + col;
+    }
+    indices
+}
+
 // A valid exclusion map is one where no square is zero, and every square
 // except a square where a queen is place is excluded by at least two queens.
 fn validate_exclusion_map(queens: u64, exclusion_map: [u8; 64]) -> bool {
@@ -514,5 +534,70 @@ mod tests {
                 "Random board not in set of all valid boards"
             );
         }
+    }
+
+    #[test]
+    fn test_get_queen_indices() {
+        // Test with a known valid solution
+        let mut solutions = Vec::new();
+        gen_all_queens_recursive(0, 0, 0, &mut solutions);
+        let test_board = solutions[0];
+
+        let indices = get_queen_indices(test_board);
+
+        // Verify we got exactly 8 indices
+        assert_eq!(indices.len(), 8, "Should return exactly 8 indices");
+
+        // Verify each index is within bounds (0-63)
+        for &idx in &indices {
+            assert!(idx < 64, "Index {} should be less than 64", idx);
+        }
+
+        // Verify each index corresponds to a queen in the original board
+        for &idx in &indices {
+            assert!(
+                (test_board & (1 << idx)) != 0,
+                "Index {} should correspond to a queen in the board",
+                idx
+            );
+        }
+
+        // Verify indices are in ascending order (since we process rows sequentially)
+        for i in 1..8 {
+            assert!(
+                indices[i] > indices[i - 1],
+                "Indices should be in ascending order"
+            );
+        }
+
+        // Verify each row has exactly one queen
+        let mut row_counts = [0; 8];
+        for &idx in &indices {
+            let row = idx / 8;
+            row_counts[row] += 1;
+        }
+        for count in row_counts {
+            assert_eq!(count, 1, "Each row should have exactly one queen");
+        }
+
+        // Verify that each column has exactly one queen
+        let mut col_counts = [0; 8];
+        for &idx in &indices {
+            let col = idx % 8;
+            col_counts[col] += 1;
+        }
+        for count in col_counts {
+            assert_eq!(count, 1, "Each column should have exactly one queen");
+        }
+
+        // Test with a manually constructed board
+        let manual_board =
+            0b00000001_00000010_00000100_00001000_00010000_00100000_01000000_10000000;
+        let manual_indices = get_queen_indices(manual_board);
+        let expected_indices = [7, 14, 21, 28, 35, 42, 49, 56];
+        assert_eq!(
+            manual_indices, expected_indices,
+            "Manual board indices don't match expected"
+        );
     }
 }
