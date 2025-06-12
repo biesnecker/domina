@@ -18,7 +18,7 @@ pub fn get_counts() -> (usize, usize) {
     (res1, res2)
 }
 
-fn get_zone_map(queens: u64, exclusion_map: [u8; 64]) -> [u8; 64] {
+fn get_zone_map(queens: u64, exclusion_map: [u8; 64], rng: &mut impl RngCore) -> [u8; 64] {
     let mut zone_map = [0; 64];
     // TODO: Implement
     zone_map
@@ -110,12 +110,8 @@ fn get_exclusion_map(queens: u64) -> [u8; 64] {
     exclusion_map
 }
 
-fn gen_random_queens() -> u64 {
-    gen_random_queens_impl(None)
-}
-
-fn gen_random_queens_with_seed(seed: u64) -> u64 {
-    gen_random_queens_impl(Some(seed))
+fn get_random_queens(rng: &mut impl RngCore) -> u64 {
+    get_random_queens_impl(rng)
 }
 
 // Checks if a queen can be placed at the specified position without violating the rules.
@@ -145,19 +141,12 @@ fn gen_all_queens_recursive(current: u64, row: usize, used_cols: u8, results: &m
     }
 }
 
-fn gen_random_queens_impl(seed: Option<u64>) -> u64 {
-    let mut rng = if let Some(seed) = seed {
-        ChaCha8Rng::seed_from_u64(seed)
-    } else {
-        let mut inner = rand::rng();
-        ChaCha8Rng::seed_from_u64(inner.next_u64())
-    };
-
+fn get_random_queens_impl(rng: &mut impl RngCore) -> u64 {
     // State for each row: which column was chosen, and the shuffled order of columns
     let mut cols_per_row: [Vec<usize>; 8] = Default::default();
     for row in 0..8 {
         let mut cols = (0..8).collect::<Vec<_>>();
-        cols.shuffle(&mut rng);
+        cols.shuffle(rng);
         cols_per_row[row] = cols;
     }
 
@@ -186,7 +175,7 @@ fn gen_random_queens_impl(seed: Option<u64>) -> u64 {
                 // Prepare for the next row
                 if cols_per_row[row].is_empty() {
                     let mut cols = (0..8).collect::<Vec<_>>();
-                    cols.shuffle(&mut rng);
+                    cols.shuffle(rng);
                     cols_per_row[row] = cols;
                 }
                 col_indices[row] = 0;
@@ -195,7 +184,7 @@ fn gen_random_queens_impl(seed: Option<u64>) -> u64 {
             // Backtrack
             if row == 0 {
                 // Should never happen, but just in case
-                panic!("Could not place 8 queens with the given seed");
+                panic!("Could not place 8 queens");
             }
             row -= 1;
             // Remove the queen from the previous row
@@ -434,11 +423,12 @@ mod tests {
     }
 
     #[test]
-    fn test_gen_random_queens() {
+    fn test_get_random_queens() {
         // Test multiple random generations to ensure they're different
-        let solution1 = gen_random_queens();
-        let solution2 = gen_random_queens();
-        let solution3 = gen_random_queens();
+        let mut rng = ChaCha8Rng::seed_from_u64(12345);
+        let solution1 = get_random_queens(&mut rng);
+        let solution2 = get_random_queens(&mut rng);
+        let solution3 = get_random_queens(&mut rng);
 
         // Verify each solution has exactly 8 queens
         assert_eq!(
@@ -478,11 +468,12 @@ mod tests {
     }
 
     #[test]
-    fn test_gen_random_queens_with_seed() {
+    fn test_get_random_queens_with_seed() {
         // Test that same seed produces same result
-        let seed = 12345;
-        let solution1 = gen_random_queens_with_seed(seed);
-        let solution2 = gen_random_queens_with_seed(seed);
+        let mut rng1 = ChaCha8Rng::seed_from_u64(12345);
+        let mut rng2 = ChaCha8Rng::seed_from_u64(12345);
+        let solution1 = get_random_queens(&mut rng1);
+        let solution2 = get_random_queens(&mut rng2);
 
         // Verify solutions are identical
         assert_eq!(
@@ -500,7 +491,8 @@ mod tests {
         );
 
         // Test that different seeds produce different results
-        let solution3 = gen_random_queens_with_seed(seed + 1);
+        let mut rng3 = ChaCha8Rng::seed_from_u64(12346);
+        let solution3 = get_random_queens(&mut rng3);
         assert_ne!(
             solution1, solution3,
             "Different seeds should produce different solutions"
@@ -516,10 +508,9 @@ mod tests {
         gen_all_queens_recursive(0, 0, 0, &mut all_solutions);
         let all_solutions_set: HashSet<u64> = all_solutions.into_iter().collect();
 
-        let mut rng = rand::rng();
-        for _ in 0..10000 {
-            let seed: u64 = rng.next_u64();
-            let board = gen_random_queens_with_seed(seed);
+        let mut rng = ChaCha8Rng::seed_from_u64(12345);
+        for _ in 0..1000 {
+            let board = get_random_queens(&mut rng);
             // Check that the board is valid
             assert!(is_valid_queen_placement(board), "Random board is not valid");
             // Check that the exclusion map is valid
